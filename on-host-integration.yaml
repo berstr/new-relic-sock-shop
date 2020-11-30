@@ -1,0 +1,37 @@
+newrelic-infrastructure:
+  verboseLog: false
+  integrations_config:
+    - name: nri-rabbitmq.yaml
+      data:
+        discovery:
+          command:
+            exec: /var/db/newrelic-infra/nri-discovery-kubernetes
+            match:
+              podName: rabbitmq-0
+        integrations:
+          - name: nri-rabbitmq
+            env:
+              HOSTNAME: ${discovery.ip}
+              PORT: 15672
+              USERNAME: admin
+              PASSWORD: verySECRETpassword
+            labels:
+              env: production
+              role: rabbitmq
+    - name: nri-mysql.yaml
+      data:
+        discovery:
+          command:
+            exec: /var/db/newrelic-infra/nri-discovery-kubernetes
+            match:
+              label.app: catalogue-db
+        integrations:
+          - name: nri-mysql
+            env:
+              # using the discovered IP as the hostname address
+              HOSTNAME: ${discovery.ip}
+              PORT: 3306
+              USERNAME: root
+              PASSWORD: fake_password
+              REMOTE_MONITORING: true
+

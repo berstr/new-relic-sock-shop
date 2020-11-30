@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "carts.fullname" . }}
+  labels:
+    {{- include "carts.labels" . | nindent 4 }}
+  namespace: {{ .Values.namespace }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "carts.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "carts.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "carts.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: "NEW_RELIC_LICENSE_KEY"
+              value: {{ .Values.newRelic.licenseKey | quote }}
+            - name: "NEW_RELIC_DISTRIBUTED_TRACING_ENABLED"
+              value: {{ .Values.newRelic.distributedTracingEnabled | quote }}
+            - name: "NEW_RELIC_APP_NAME"
+              value: "{{ .Values.prefix }}{{ .Chart.Name }}"
+            - name: "NEW_RELIC_LOG_FILE_NAME"
+              value: STDOUT
+            - name: "JAVA_OPTS"
+              value: -javaagent:/tmp/agent.jar -Dspring.sleuth.enabled=false -Xms64m -Xmx128m
+                -XX:PermSize=32m -XX:MaxPermSize=64m -XX:+UseG1GC -Djava.security.egd=file:/dev/urandom
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-volume
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - emptyDir:
+            medium: Memory
+          name: tmp-volume
+      initContainers:
+        - command:
+            - cp
+            - /agent.jar
+            - /tmp/agent.jar
+          image: berndstransky/sock-shop-java-agent:1.0
+          imagePullPolicy: IfNotPresent
+          name: agent-init
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-volume
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

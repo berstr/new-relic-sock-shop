@@ -1,0 +1,29 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: {{ include "logs-exporter.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "logs-exporter.labels" . | nindent 4 }}
+spec:
+  successfulJobsHistoryLimit: 0
+  failedJobsHistoryLimit: 0
+  schedule: "{{ .Values.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "logs-exporter.serviceAccountName" . }}
+          containers:
+            - name: {{ .Chart.Name }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              env:
+                - name: "ACCESS_KEY_ID"
+                  value: {{ .Values.aws.accessKeyId | quote }}
+                - name: "ACCESS_KEY_SECRET"
+                  value: {{ .Values.aws.secretAccessKey | quote }}
+                - name: "NEW_RELIC_QUERY_KEY"
+                  value: {{ .Values.newRelic,queryKey | quote }}
+          restartPolicy: {{ .Values.restartPolicy }}
+  concurrencyPolicy: {{ .Values.concurrencyPolicy }}
